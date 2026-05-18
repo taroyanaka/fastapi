@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI画像黒塗りツール - 改行区切り対応版</title>
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --bg: #f8f9fa; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: #333; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        h1 { text-align: center; color: #222; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        /* テキストエリア・入力エリア */
+        textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; resize: vertical; margin-bottom: 10px; }
+        .hint { font-size: 0.85em; color: #666; margin-bottom: 10px; }
+
+        /* アップロードエリア */
+        .upload-zone { border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 8px; transition: 0.3s; background: #fff; }
+        .upload-zone:hover { border-color: var(--primary); background: #f0f7ff; }
+        .btn-exec { background: var(--success); color: white; border: none; width: 100%; padding: 15px; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn-exec:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* 結果表示 */
+        #result-container { display: none; text-align: center; }
+        #result-image { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); margin-top: 20px; }
+        .loader { display: none; margin: 20px 0; color: #555; }
+        .loader-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <h1>AI画像黒塗りツール</h1>
+
+    <div class="card">
+        <h3>1. 対象キーワードを改行区切りで指定</h3>
+        <p class="hint">黒塗りにしたい単語や文章を1行ずつ入力してください。コピー＆ペーストも可能です。</p>
+        <textarea id="word-textarea" placeholder="分離&#10;精製&#10;純物質&#10;混合物&#10;ろ過">分離
+精製
+純物質
+混合物
+ろ過</textarea>
+    </div>
+
+    <div class="card">
+        <h3>2. 画像アップロード</h3>
+        <div class="upload-zone">
+            <input type="file" id="image-file" accept="image/png, image/jpeg" style="cursor: pointer;">
+            <p style="font-size: 0.8em; color: #888; margin-top: 10px;">PNG または JPEG (1000KB前後を推奨)</p>
+        </div>
+        <button id="upload-btn" class="btn-exec" onclick="uploadAndProcess()">黒塗り処理を実行する</button>
+        
+        <div class="loader" id="loader">
+            <div class="loader-spinner"></div>
+            <p id="loader-status">AIが解析中...<br><small>※Render無料枠のため、起動に最大1分かかる場合があります</small></p>
+        </div>
+    </div>
+
+    <div class="card" id="result-container">
+        <h3>3. 処理結果</h3>
+        <img id="result-image" alt="処理後の画像">
+        <div style="margin-top: 20px;">
+            <a id="download-link" download="masked_result.png" style="text-decoration: none; color: var(--primary); font-weight: bold; font-size: 1.1em;">画像を保存する</a>
+        </div>
+    </div>
+
+    <script>
+        const API_ENDPOINT = 'https://fastapi-xpcj.onrender.com/mask-image';
+
+        async function uploadAndProcess() {
+            const fileInput = document.getElementById('image-file');
+            const wordTextarea = document.getElementById('word-textarea');
+            const btn = document.getElementById('upload-btn');
+            const loader = document.getElementById('loader');
+            const resultArea = document.getElementById('result-container');
+            const resultImg = document.getElementById('result-image');
+            const downloadLink = document.getElementById('download-link');
+
+            // 1. 画像チェック
+            if (!fileInput.files[0]) {
+                alert("画像を選択してください");
+                return;
+            }
+
+            // 2. 単語リスト作成（改行で分割し、空行を除去）
+            const targetWords = wordTextarea.value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s !== "");
+
+            if (targetWords.length === 0) {
+                alert("黒塗りする単語を1つ以上入力してください");
+                return;
+            }
+
+            // UIを処理中に変更
+            btn.disabled = true;
+            loader.style.display = 'block';
+            resultArea.style.display = 'none';
+
+            // FormDataの構築
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('target_words', JSON.stringify(targetWords));
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'サーバーエラーが発生しました');
+                }
+
+                // バイナリデータをURLに変換
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                
+                // 結果を表示
+                resultImg.src = url;
+                downloadLink.href = url;
+                resultArea.style.display = 'block';
+                
+                // 完了時にスクロール
+                resultArea.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                alert("エラーが発生しました: " + error.message);
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                loader.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

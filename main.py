@@ -7,7 +7,18 @@ from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 import json
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+# CORSを許可する設定
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 自分のサイトだけに絞る場合は ["https://your-site.com"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
