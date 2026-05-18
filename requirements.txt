@@ -1,6 +1,9 @@
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.2.1+cpu
+torchvision==0.17.1+cpu
 fastapi
 uvicorn
 python-multipart
 easyocr
 opencv-python-headless
-numpy
+numpy<2.0.0
